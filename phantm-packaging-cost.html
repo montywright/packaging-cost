@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Phantm — Packaging Cost Visibility</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.09);
+    --border2: rgba(0,0,0,0.15);
+    --text: #1a1a18;
+    --text2: #6b6b65;
+    --text3: #a0a09a;
+    --green: #0f6e56;
+    --green-bg: #e1f5ee;
+    --green-text: #085041;
+    --red: #a32d2d;
+    --red-bg: #fcebeb;
+    --red-text: #501313;
+    --amber: #854f0b;
+    --amber-bg: #faeeda;
+    --amber-text: #412402;
+    --blue: #185fa5;
+    --blue-bg: #e6f1fb;
+    --blue-text: #042c53;
+    --phantm: #1a3d28;
+    --phantm-light: #e8f2ec;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* NAV */
+  nav { background: var(--phantm); color: #fff; display: flex; align-items: center; gap: 0; height: 48px; padding: 0 24px; }
+  .nav-logo { font-size: 18px; font-weight: 600; letter-spacing: -0.5px; color: #fff; margin-right: 40px; }
+  .nav-logo span { color: #6dbd95; }
+  .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: rgba(255,255,255,0.55); padding: 0 16px; height: 48px; display: flex; align-items: center; text-transform: uppercase; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s; }
+  .nav-link:hover { color: rgba(255,255,255,0.85); }
+  .nav-link.active { color: #fff; border-bottom-color: #6dbd95; }
+
+  /* PAGE */
+  .page { padding: 28px 28px 48px; max-width: 1400px; }
+  .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+  .page-title { font-size: 22px; font-weight: 500; letter-spacing: -0.3px; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text); transition: background .12s, border-color .12s; }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--phantm); color: #fff; border-color: var(--phantm); }
+  .btn-primary:hover { background: #254d34; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-select { appearance: none; font-family: inherit; font-size: 13px; padding: 7px 28px 7px 12px; border: 1px solid var(--border2); border-radius: var(--radius); background: var(--surface) url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b6b65' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; color: var(--text); cursor: pointer; }
+  .filter-select:focus { outline: none; border-color: var(--phantm); }
+
+  /* STAT CARDS */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; }
+  .stat-label { font-size: 12px; color: var(--text2); font-weight: 400; margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 500; letter-spacing: -0.5px; display: flex; align-items: baseline; gap: 8px; }
+  .stat-delta { font-size: 12px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+  .delta-up { background: var(--red-bg); color: var(--red-text); }
+  .delta-down { background: var(--green-bg); color: var(--green-text); }
+  .delta-neutral { background: var(--surface2); color: var(--text2); }
+  .stat-ai { border-color: rgba(24,95,165,0.25); background: linear-gradient(135deg, #fff 60%, #f0f6ff); }
+  .ai-badge { font-size: 11px; background: var(--blue-bg); color: var(--blue-text); padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+
+  /* MAIN LAYOUT */
+  .main { display: grid; grid-template-columns: 300px 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* SKU LIST */
+  .sku-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
+  .panel-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 13px; font-weight: 500; }
+  .sku-search { width: 100%; padding: 8px 12px; border: none; border-bottom: 1px solid var(--border); font-family: inherit; font-size: 13px; background: var(--surface2); color: var(--text); outline: none; }
+  .sku-search::placeholder { color: var(--text3); }
+  .sku-list { overflow-y: auto; flex: 1; max-height: 380px; }
+  .sku-row { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sku-row:hover { background: var(--surface2); }
+  .sku-row.selected { background: var(--phantm-light); border-left: 3px solid var(--phantm); }
+  .sku-name { font-size: 13px; line-height: 1.3; flex: 1; }
+  .sku-group { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .sku-cost { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .accuracy-pill { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.03em; white-space: nowrap; }
+  .acc-low { background: var(--red-bg); color: var(--red); }
+  .acc-med { background: var(--amber-bg); color: var(--amber); }
+  .acc-high { background: var(--green-bg); color: var(--green); }
+
+  /* DETAIL PANEL */
+  .detail-panel { display: flex; flex-direction: column; gap: 16px; }
+
+  /* CHARTS ROW */
+  .charts-row { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+  .card-title { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2); margin-bottom: 14px; }
+  .donut-wrap { display: flex; flex-direction: column; align-items: center; }
+  .donut-canvas-wrap { position: relative; width: 160px; height: 160px; margin: 0 auto 14px; }
+  .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .donut-center-value { font-size: 20px; font-weight: 500; }
+  .donut-center-label { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .legend { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-name { flex: 1; color: var(--text2); }
+  .legend-pct { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .legend-amt { font-size: 11px; color: var(--text3); margin-left: auto; }
+
+  /* TREND CHART */
+  .trend-card { flex: 1; }
+
+  /* SUPPLIER TABLE */
+  .supplier-row { display: grid; grid-template-columns: 1fr 90px 90px 90px 90px 110px; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .supplier-row:last-child { border-bottom: none; }
+  .supplier-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text2); background: var(--surface2); border-radius: var(--radius) var(--radius) 0 0; }
+  .supplier-row.current-supplier { background: var(--phantm-light); }
+  .supplier-name { font-weight: 500; }
+  .badge-current { font-size: 10px; background: var(--phantm-light); color: var(--phantm); padding: 1px 6px; border-radius: 3px; margin-left: 6px; font-weight: 600; }
+  .cost-green { color: var(--green); font-weight: 500; }
+  .cost-red { color: var(--red); }
+  .sus-bar { display: flex; gap: 2px; }
+  .sus-pip { width: 10px; height: 10px; border-radius: 2px; background: var(--border2); }
+  .sus-pip.on { background: var(--green); }
+  .btn-quote { font-size: 11px; padding: 4px 10px; white-space: nowrap; }
+
+  /* AI PANEL */
+  .ai-panel { background: var(--surface); border: 1px solid rgba(24,95,165,0.2); border-radius: var(--radius-lg); overflow: hidden; }
+  .ai-header { background: linear-gradient(90deg, #e6f1fb 0%, #f0f8ff 100%); padding: 12px 18px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(24,95,165,0.12); }
+  .ai-icon { font-size: 16px; }
+  .ai-title { font-size: 13px; font-weight: 600; color: var(--blue-text); }
+  .ai-subtitle { font-size: 11px; color: var(--blue); margin-left: auto; }
+  .ai-suggestions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px; }
+  .ai-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; position: relative; transition: border-color .15s, box-shadow .15s; cursor: pointer; }
+  .ai-card:hover { border-color: rgba(24,95,165,0.3); box-shadow: 0 2px 12px rgba(24,95,165,0.08); }
+  .ai-card-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin-bottom: 6px; }
+  .ai-card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 8px; line-height: 1.35; }
+  .ai-saving { font-size: 18px; font-weight: 500; color: var(--green); }
+  .ai-saving-label { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .ai-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 2px 7px; border-radius: 20px; margin-top: 10px; font-weight: 500; }
+  .ai-tag.material { background: var(--green-bg); color: var(--green-text); }
+  .ai-tag.supplier { background: var(--blue-bg); color: var(--blue-text); }
+  .ai-tag.volume { background: var(--amber-bg); color: var(--amber-text); }
+  .ai-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .ai-footer-note { font-size: 11px; color: var(--text3); }
+
+  /* BOTTOM GRID */
+  .bottom-row { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+
+  /* TRADE-OFF CHART */
+  .tradeoff-axes { display: flex; gap: 24px; margin-bottom: 12px; }
+  .axis-label { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 5px; }
+  .axis-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* COST HEALTH */
+  .health-list { display: flex; flex-direction: column; gap: 8px; }
+  .health-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--border); font-size: 12px; }
+  .health-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+  .health-text { flex: 1; }
+  .health-action { font-size: 11px; color: var(--blue); cursor: pointer; white-space: nowrap; }
+  .health-ok { border-color: rgba(15,110,86,0.2); background: rgba(225,245,238,0.4); }
+  .health-warn { border-color: rgba(133,79,11,0.2); background: rgba(250,238,218,0.4); }
+  .health-alert { border-color: rgba(163,45,45,0.2); background: rgba(252,235,235,0.4); }
+
+  /* RESPONSIVE */
+  @media (max-width: 1100px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .main { grid-template-columns: 1fr; }
+    .ai-suggestions { grid-template-columns: 1fr 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .charts-row { grid-template-columns: 1fr; }
+    .ai-suggestions { grid-template-columns: 1fr; }
+  }
+
+  /* EMPTY STATE */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180px; color: var(--text3); font-size: 13px; gap: 8px; }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab { padding: 9px 18px; font-size: 12px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); transition: color .12s; margin-bottom: -1px; }
+  .tab.active { color: var(--phantm); border-bottom-color: var(--phantm); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  footer { text-align: center; padding: 20px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">ph<span>a</span>ntm</div>
+  <div class="nav-link">Products</div>
+  <div class="nav-link">Suppliers</div>
+  <div class="nav-link">Insights</div>
+  <div class="nav-link active">Packaging Cost</div>
+  <div class="nav-link">Reports</div>
+  <div class="nav-link">File Manager</div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Packaging Cost Visibility</div>
+      <div class="page-sub">Per-SKU cost intelligence · Finance, ops &amp; procurement</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" onclick="alert('Export triggered — CSV with all cost data')">↓ Export report</button>
+      <button class="btn btn-primary btn-sm" onclick="alert('Bulk negotiation brief generated')">Generate negotiation brief ↗</button>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <select class="filter-select" onchange="filterSKUs()" id="filter-group">
+      <option value="">All product groups</option>
+      <option value="800 LIVING-HOME">800 LIVING-HOME</option>
+      <option value="800 KITCHEN">800 KITCHEN</option>
+      <option value="700 OUTDOOR">700 OUTDOOR</option>
+    </select>
+    <select class="filter-select" id="filter-material" onchange="filterSKUs()">
+      <option value="">All materials</option>
+      <option value="Box">Box</option>
+      <option value="Bag">Bag</option>
+      <option value="Wrap">Wrap/Film</option>
+      <option value="Labels">Labels/Stickers</option>
+      <option value="Card">Card</option>
+      <option value="Tray">Tray</option>
+    </select>
+    <select class="filter-select" id="filter-accuracy" onchange="filterSKUs()">
+      <option value="">All accuracy</option>
+      <option value="Low">Low accuracy</option>
+      <option value="Med">Medium accuracy</option>
+      <option value="High">High accuracy</option>
+    </select>
+    <select class="filter-select" id="filter-sort">
+      <option value="cost-desc">Sort: Highest cost</option>
+      <option value="cost-asc">Sort: Lowest cost</option>
+      <option value="saving">Sort: Savings potential</option>
+    </select>
+    <div style="margin-left:auto;font-size:12px;color:var(--text2)" id="filter-count">Showing all 14 SKUs</div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Total packaging spend (annual)</div>
+      <div class="stat-value">$4.2M <span class="stat-delta delta-up">↑ 12% YoY</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg cost per unit across SKUs</div>
+      <div class="stat-value">$0.38 <span class="stat-delta delta-down">↓ 3% MoM</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">SKUs with cost data</div>
+      <div class="stat-value">1,284 <span class="stat-delta delta-neutral">of 12,655</span></div>
+    </div>
+    <div class="stat-card stat-ai">
+      <div class="stat-label">AI-identified savings potential <span class="ai-badge">✦ AI</span></div>
+      <div class="stat-value">$340K <span class="stat-delta delta-down">↓ p.a.</span></div>
+    </div>
+  </div>
+
+  <!-- MAIN 2-COLUMN -->
+  <div class="main">
+
+    <!-- SKU LIST -->
+    <div class="sku-panel">
+      <div class="panel-header">
+        <span class="panel-title">SKU list</span>
+        <span style="font-size:11px;color:var(--text3)" id="sku-count">14 SKUs</span>
+      </div>
+      <input class="sku-search" type="text" placeholder="Search products…" oninput="searchSKUs(this.value)" id="sku-search"/>
+      <div class="sku-list" id="sku-list"></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="card" style="display:flex;align-items:center;justify-content:center;min-height:220px;">
+        <div class="empty"><div class="empty-icon">📦</div><div>Select a SKU to view cost breakdown</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI SUGGESTIONS -->
+  <div class="ai-panel" id="ai-section" style="margin-bottom:16px;display:none;">
+    <div class="ai-header">
+      <span class="ai-icon">✦</span>
+      <span class="ai-title">AI cost suggestions</span>
+      <span class="ai-subtitle" id="ai-sku-name"></span>
+    </div>
+    <div class="ai-suggestions" id="ai-suggestions"></div>
+    <div class="ai-footer">
+      <span class="ai-footer-note">Suggestions based on market data, supplier alternatives, and your volume profile. Not financial advice.</span>
+      <button class="btn btn-sm" onclick="alert('Full AI analysis report generated')">View full analysis ↗</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-row">
+
+    <!-- SUPPLIER COMPARISON -->
+    <div class="card" id="supplier-section" style="display:none;">
+      <div class="card-title">Supplier comparison</div>
+      <div id="supplier-table"></div>
+    </div>
+
+    <!-- COST HEALTH -->
+    <div class="card" id="health-section" style="display:none;">
+      <div class="card-title">Cost health signals</div>
+      <div class="health-list" id="health-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>Phantm · Packaging Cost Visibility Layer · Demo build · Data is illustrative</footer>
+
+<script>
+const COLORS = ['#185fa5','#0f6e56','#854f0b','#a32d2d','#533ab7','#0c6e6e'];
+
+const SKUS = [
+  { id:1, name:'1.3L Dry Food Storage', group:'800 LIVING-HOME', sku:'43583928', items:['Labels/Stickers'], accuracy:'Low', qty:15456, costUnit:0.38, costAnnual:5873, breakdown:[{label:'Label stock',pct:55,col:'#185fa5'},{label:'Adhesive',pct:25,col:'#0f6e56'},{label:'Print run',pct:20,col:'#854f0b'}], trend:[0.41,0.40,0.39,0.40,0.38,0.38], savingPct:18 },
+  { id:2, name:'1.5L Glass Jar w/Wood Lid', group:'800 LIVING-HOME', sku:'42878094', items:['Wrap/Film'], accuracy:'Low', qty:75162, costUnit:0.61, costAnnual:45848, breakdown:[{label:'Glass wrap',pct:50,col:'#185fa5'},{label:'Wood lid band',pct:30,col:'#0f6e56'},{label:'Label',pct:20,col:'#854f0b'}], trend:[0.58,0.59,0.62,0.61,0.63,0.61], savingPct:22 },
+  { id:3, name:'1.5L Ice Crush Blender', group:'800 LIVING-HOME', sku:'42894735', items:['Box','Tray'], accuracy:'Low', qty:21844, costUnit:0.54, costAnnual:11796, breakdown:[{label:'Corrugated box',pct:58,col:'#185fa5'},{label:'Pulp tray',pct:28,col:'#0f6e56'},{label:'Print/branding',pct:14,col:'#854f0b'}], trend:[0.52,0.53,0.55,0.54,0.54,0.54], savingPct:12 },
+  { id:4, name:'1.5L Ice Maker SS', group:'800 LIVING-HOME', sku:'43577682', items:['Tray','Box'], accuracy:'Low', qty:2656, costUnit:0.49, costAnnual:1301, breakdown:[{label:'Foam tray',pct:45,col:'#185fa5'},{label:'Outer box',pct:40,col:'#0f6e56'},{label:'Insert card',pct:15,col:'#854f0b'}], trend:[0.51,0.50,0.50,0.49,0.49,0.49], savingPct:9 },
+  { id:5, name:'1.5L Rnd Porcelain Cont', group:'800 LIVING-HOME', sku:'43378661', items:['Labels/Stickers','Wrap/Film','box'], accuracy:'Low', qty:5928, costUnit:0.72, costAnnual:4268, breakdown:[{label:'Wrap film',pct:38,col:'#185fa5'},{label:'Label set',pct:32,col:'#0f6e56'},{label:'Inner box',pct:30,col:'#854f0b'}], trend:[0.68,0.70,0.71,0.72,0.73,0.72], savingPct:25 },
+  { id:6, name:'1.5L S/Steel Blender', group:'800 LIVING-HOME', sku:'42894698', items:['Box','Tray'], accuracy:'Low', qty:57916, costUnit:0.44, costAnnual:25483, breakdown:[{label:'Box board',pct:62,col:'#185fa5'},{label:'Tray insert',pct:26,col:'#0f6e56'},{label:'Labels',pct:12,col:'#854f0b'}], trend:[0.46,0.45,0.45,0.44,0.44,0.44], savingPct:14 },
+  { id:7, name:'1.5L SQ Slide Lock Cont', group:'800 LIVING-HOME', sku:'43521258', items:['Wrap/Film','Card'], accuracy:'Low', qty:52032, costUnit:0.29, costAnnual:15089, breakdown:[{label:'Shrink wrap',pct:48,col:'#185fa5'},{label:'Header card',pct:35,col:'#0f6e56'},{label:'Adhesive',pct:17,col:'#854f0b'}], trend:[0.31,0.30,0.30,0.29,0.29,0.29], savingPct:8 },
+  { id:8, name:'1.5L SS Drinkware Flask', group:'800 LIVING-HOME', sku:'43544561', items:['Labels/Stickers'], accuracy:'Low', qty:16500, costUnit:0.33, costAnnual:5445, breakdown:[{label:'Label stock',pct:60,col:'#185fa5'},{label:'Print',pct:25,col:'#0f6e56'},{label:'Adhesive coat',pct:15,col:'#854f0b'}], trend:[0.34,0.34,0.33,0.33,0.33,0.33], savingPct:11 },
+  { id:9, name:'1.75L Retro Blender Green', group:'800 LIVING-HOME', sku:'43534678', items:['Box','Tray'], accuracy:'Low', qty:4650, costUnit:0.58, costAnnual:2697, breakdown:[{label:'Colour box',pct:55,col:'#185fa5'},{label:'Moulded tray',pct:32,col:'#0f6e56'},{label:'Tissue wrap',pct:13,col:'#854f0b'}], trend:[0.55,0.57,0.57,0.58,0.58,0.58], savingPct:16 },
+  { id:10, name:'1.7L Fridge Food Saver (A)', group:'800 LIVING-HOME', sku:'43639458', items:['Box','Labels/Stickers'], accuracy:'Low', qty:12340, costUnit:0.47, costAnnual:5800, breakdown:[{label:'Box',pct:52,col:'#185fa5'},{label:'Label',pct:30,col:'#0f6e56'},{label:'Glue dot',pct:18,col:'#854f0b'}], trend:[0.49,0.48,0.48,0.47,0.47,0.47], savingPct:10 },
+  { id:11, name:'1.7L Fridge Food Saver (B)', group:'800 LIVING-HOME', sku:'42691624', items:['Labels/Stickers'], accuracy:'Low', qty:13980, costUnit:0.22, costAnnual:3076, breakdown:[{label:'Label',pct:70,col:'#185fa5'},{label:'Print',pct:20,col:'#0f6e56'},{label:'Application',pct:10,col:'#854f0b'}], trend:[0.23,0.22,0.22,0.22,0.22,0.22], savingPct:6 },
+  { id:12, name:'1.7L Kettle Black SS', group:'800 LIVING-HOME', sku:'43465729', items:['Bag'], accuracy:'Low', qty:7338, costUnit:0.18, costAnnual:1321, breakdown:[{label:'Poly bag',pct:65,col:'#185fa5'},{label:'Sticker',pct:22,col:'#0f6e56'},{label:'Twist tie',pct:13,col:'#854f0b'}], trend:[0.19,0.18,0.18,0.18,0.18,0.18], savingPct:15 },
+  { id:13, name:'1.7L Kettle Black Silv', group:'800 LIVING-HOME', sku:'43262441', items:['Card','Box'], accuracy:'Low', qty:27900, costUnit:0.44, costAnnual:12276, breakdown:[{label:'Outer box',pct:50,col:'#185fa5'},{label:'Inner card',pct:35,col:'#0f6e56'},{label:'Tape',pct:15,col:'#854f0b'}], trend:[0.46,0.45,0.45,0.44,0.44,0.44], savingPct:19 },
+  { id:14, name:'1.7L Kettle Plast Whte', group:'800 LIVING-HOME', sku:'41989326', items:['Bag'], accuracy:'Low', qty:174392, costUnit:0.12, costAnnual:20927, breakdown:[{label:'Poly bag',pct:72,col:'#185fa5'},{label:'Label',pct:18,col:'#0f6e56'},{label:'Seal',pct:10,col:'#854f0b'}], trend:[0.13,0.13,0.12,0.12,0.12,0.12], savingPct:7 },
+];
+
+const SUPPLIERS = {
+  default: [
+    { name:'Supplier A', badge:'current', unitCost: null, leadDays:14, sus:3, moq:'5,000', note:'Current incumbent' },
+    { name:'Supplier B', badge:'', unitCost:-0.07, leadDays:18, sus:5, moq:'8,000', note:'Higher sustainability' },
+    { name:'Supplier C', badge:'', unitCost:-0.12, leadDays:22, sus:2, moq:'3,000', note:'Lowest cost, longer lead' },
+    { name:'Supplier D', badge:'', unitCost:-0.04, leadDays:11, sus:4, moq:'10,000', note:'Fast turnaround' },
+  ]
+};
+
+const AI_SUGGESTIONS = (sku) => [
+  { type:'material', label:'Material swap', title:`Switch to recycled ${sku.items[0]} substrate`, saving: (sku.costUnit * 0.15).toFixed(2), savingAnnual: Math.round(sku.costAnnual * 0.15).toLocaleString(), detail:'Market data shows 15% lower cost with comparable performance' },
+  { type:'supplier', label:'Supplier switch', title:'Consolidate to Supplier B for volume discount', saving: (sku.costUnit * 0.11).toFixed(2), savingAnnual: Math.round(sku.costAnnual * 0.11).toLocaleString(), detail:'Supplier B offers 11% reduction at current volume' },
+  { type:'volume', label:'Volume leverage', title:'Increase order qty to unlock price break', saving: (sku.costUnit * 0.08).toFixed(2), savingAnnual: Math.round(sku.costAnnual * 0.08).toLocaleString(), detail:'+25% order qty hits next MOQ tier' },
+];
+
+let selectedSKU = null;
+let trendChart = null;
+let donutChart = null;
+let filteredSKUs = [...SKUS];
+
+function renderSKUList() {
+  const list = document.getElementById('sku-list');
+  list.innerHTML = filteredSKUs.map(s => `
+    <div class="sku-row ${selectedSKU?.id === s.id ? 'selected' : ''}" onclick="selectSKU(${s.id})">
+      <div>
+        <div class="sku-name">${s.name}</div>
+        <div class="sku-group">${s.group} · SKU ${s.sku}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="sku-cost">$${s.costUnit.toFixed(2)}</div>
+        <div style="margin-top:3px"><span class="accuracy-pill acc-${s.accuracy.toLowerCase()}">${s.accuracy}</span></div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('sku-count').textContent = `${filteredSKUs.length} SKUs`;
+  document.getElementById('filter-count').textContent = `Showing ${filteredSKUs.length} of ${SKUS.length} SKUs`;
+}
+
+function filterSKUs() {
+  const group = document.getElementById('filter-group').value;
+  const mat = document.getElementById('filter-material').value;
+  const acc = document.getElementById('filter-accuracy').value;
+  filteredSKUs = SKUS.filter(s => {
+    if (group && s.group !== group) return false;
+    if (mat && !s.items.some(i => i.includes(mat.split('/')[0]))) return false;
+    if (acc && s.accuracy !== acc) return false;
+    return true;
+  });
+  renderSKUList();
+}
+
+function searchSKUs(val) {
+  const q = val.toLowerCase();
+  filteredSKUs = SKUS.filter(s => s.name.toLowerCase().includes(q) || s.sku.includes(q));
+  renderSKUList();
+}
+
+function selectSKU(id) {
+  selectedSKU = SKUS.find(s => s.id === id);
+  renderSKUList();
+  renderDetail();
+}
+
+function renderDetail() {
+  if (!selectedSKU) return;
+  const s = selectedSKU;
+
+  // Destroy old charts
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+  if (donutChart) { donutChart.destroy(); donutChart = null; }
+
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:17px;font-weight:500;letter-spacing:-0.2px">${s.name}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${s.group} · SKU ${s.sku} · ${s.items.join(', ')}</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span class="accuracy-pill acc-${s.accuracy.toLowerCase()}" style="font-size:12px;padding:4px 10px;">Accuracy: ${s.accuracy}</span>
+        <button class="btn btn-sm" onclick="alert('Opening cost data editor for ${s.name}')">Edit cost data</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;margin-top:12px;">
+
+      <div class="card" style="padding:16px;">
+        <div class="card-title">Cost breakdown</div>
+        <div class="donut-wrap">
+          <div class="donut-canvas-wrap">
+            <canvas id="donut-canvas"></canvas>
+            <div class="donut-center">
+              <div class="donut-center-value">$${s.costUnit.toFixed(2)}</div>
+              <div class="donut-center-label">per unit</div>
+            </div>
+          </div>
+          <div class="legend">
+            ${s.breakdown.map(b => `
+              <div class="legend-item">
+                <div class="legend-dot" style="background:${b.col}"></div>
+                <span class="legend-name">${b.label}</span>
+                <span class="legend-pct">${b.pct}%</span>
+                <span class="legend-amt">$${(s.costUnit * b.pct / 100).toFixed(3)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="card trend-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0">Cost per unit — last 6 months</div>
+          <div style="font-size:12px;color:var(--text2)">Annual spend: <strong>$${s.costAnnual.toLocaleString()}</strong></div>
+        </div>
+        <canvas id="trend-canvas" height="90"></canvas>
+        <div style="display:flex;gap:24px;margin-top:12px;flex-wrap:wrap;">
+          <div style="font-size:12px;color:var(--text2)">Min: <strong>$${Math.min(...s.trend).toFixed(2)}</strong></div>
+          <div style="font-size:12px;color:var(--text2)">Max: <strong>$${Math.max(...s.trend).toFixed(2)}</strong></div>
+          <div style="font-size:12px;color:var(--text2)">Current: <strong>$${s.trend[5].toFixed(2)}</strong></div>
+          <div style="font-size:12px;color:var(--text2)">Annual qty: <strong>${s.qty.toLocaleString()}</strong></div>
+          <div style="font-size:12px;color:var(--text2)">Saving potential: <strong style="color:var(--green)">↓ ${s.savingPct}%</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Donut
+  const dCtx = document.getElementById('donut-canvas').getContext('2d');
+  donutChart = new Chart(dCtx, {
+    type: 'doughnut',
+    data: {
+      labels: s.breakdown.map(b => b.label),
+      datasets: [{ data: s.breakdown.map(b => b.pct), backgroundColor: s.breakdown.map(b => b.col), borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: { cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } } }, animation: { duration: 400 } }
+  });
+
+  // Trend
+  const tCtx = document.getElementById('trend-canvas').getContext('2d');
+  const months = ['Nov','Dec','Jan','Feb','Mar','Apr'];
+  trendChart = new Chart(tCtx, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [{
+        data: s.trend,
+        borderColor: '#185fa5',
+        backgroundColor: 'rgba(24,95,165,0.08)',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#185fa5',
+        fill: true,
+        tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` $${ctx.parsed.y.toFixed(2)}/unit` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#a0a09a' } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, color: '#a0a09a', callback: v => '$'+v.toFixed(2) } }
+      },
+      animation: { duration: 400 }
+    }
+  });
+
+  // AI section
+  const aiSection = document.getElementById('ai-section');
+  aiSection.style.display = 'block';
+  document.getElementById('ai-sku-name').textContent = s.name;
+  const suggestions = AI_SUGGESTIONS(s);
+  document.getElementById('ai-suggestions').innerHTML = suggestions.map(sg => `
+    <div class="ai-card" onclick="alert('Exploring: ${sg.title}')">
+      <div class="ai-card-label">${sg.label}</div>
+      <div class="ai-card-title">${sg.title}</div>
+      <div class="ai-saving">↓ $${sg.saving}/unit</div>
+      <div class="ai-saving-label">~$${sg.savingAnnual} saved annually</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">${sg.detail}</div>
+      <span class="ai-tag ${sg.type}">${sg.type}</span>
+    </div>
+  `).join('');
+
+  // Supplier section
+  const supSection = document.getElementById('supplier-section');
+  supSection.style.display = 'block';
+  const suppliers = SUPPLIERS.default.map(sup => ({
+    ...sup,
+    calcCost: sup.badge === 'current' ? s.costUnit : +(s.costUnit + sup.unitCost).toFixed(2),
+    diff: sup.badge === 'current' ? 0 : sup.unitCost,
+  }));
+  document.getElementById('supplier-table').innerHTML = `
+    <div class="supplier-row supplier-head">
+      <div>Supplier</div><div>Unit cost</div><div>vs current</div><div>Lead time</div><div>Sustainability</div><div></div>
+    </div>
+    ${suppliers.map(sup => `
+      <div class="supplier-row ${sup.badge === 'current' ? 'current-supplier' : ''}">
+        <div class="supplier-name">${sup.name}${sup.badge === 'current' ? '<span class="badge-current">Current</span>' : ''}<div style="font-size:11px;color:var(--text2);font-weight:400">${sup.note}</div></div>
+        <div class="${sup.badge === 'current' ? '' : sup.diff < 0 ? 'cost-green' : 'cost-red'}">$${sup.calcCost.toFixed(2)}</div>
+        <div class="${sup.diff < 0 ? 'cost-green' : 'cost-red'}">${sup.badge === 'current' ? '—' : (sup.diff < 0 ? '↓ ' : '↑ ') + '$' + Math.abs(sup.diff).toFixed(2)}</div>
+        <div>${sup.leadDays} days</div>
+        <div class="sus-bar">${[1,2,3,4,5].map(i => `<div class="sus-pip ${i <= sup.sus ? 'on' : ''}"></div>`).join('')}</div>
+        <div><button class="btn btn-sm btn-quote" onclick="alert('Quote requested from ${sup.name}')">Request quote</button></div>
+      </div>
+    `).join('')}
+  `;
+
+  // Health section
+  document.getElementById('health-section').style.display = 'block';
+  const healthItems = [
+    { icon:'⚠', cls:'health-warn', text:`Cost up ${Math.round(Math.random()*10+5)}% vs category average`, action:'View peers' },
+    { icon:'✓', cls:'health-ok', text:'Supplier contract expires in 4 months — well ahead of review', action:'View contract' },
+    { icon:'!', cls:'health-alert', text:`No secondary supplier qualified — single-source risk`, action:'Qualify supplier' },
+    { icon:'✓', cls:'health-ok', text:'Material certified recycled content ≥30%', action:'View cert' },
+    { icon:'⚠', cls:'health-warn', text:'Annual volume trending below negotiated MOQ tier', action:'Adjust forecast' },
+  ];
+  document.getElementById('health-list').innerHTML = healthItems.map(h => `
+    <div class="health-item ${h.cls}">
+      <div class="health-icon">${h.icon}</div>
+      <div class="health-text">${h.text}</div>
+      <div class="health-action" onclick="alert('${h.action}')">${h.action} →</div>
+    </div>
+  `).join('');
+}
+
+// INIT
+renderSKUList();
+</script>
+</body>
+</html>
